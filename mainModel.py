@@ -103,6 +103,9 @@ class Activation_Softmax_Loss_CategoricalCrossentropy():
         # and substract column at y_true position for each rows
         # (simplier way to do Softmax backward)
         self.dinputs[range(samples), y_true] -= 1
+        print(samples == len(y_true))
+        print(self.dinputs.shape)
+        print(y_true)
         # Normalize gradient
         self.dinputs = self.dinputs / samples
 
@@ -125,7 +128,7 @@ class Layer_Dense:
 
     def backward(self, dvalues):
         self.dweights = np.dot(self.inputs.T, dvalues)
-        self.dbiases = 0.01*np.sum(dvalues, axis=0, keepdims=True)
+        self.dbiases = np.sum(dvalues, axis=0, keepdims=True)
         # Gradient on values
         self.dinputs = np.dot(dvalues, self.weights.T)
 
@@ -141,12 +144,12 @@ class Activation_Relu:
         # let's make a copy of values first
         self.dinputs = dvalues.copy()
         # Zero gradient where inputs values were negative
-        self.dinputs[self.dinputs <= 0] = 0
+        self.dinputs[self.inputs <= 0] = 0
 
 class Optimizer_SGD:
     # Initialize optimizer - set settings
     # Learning rate of 1
-    def __init__(self, learning_rate=1, decay=0., momentum=0):
+    def __init__(self, learning_rate=0.85, decay=0, momentum=0):
         self.learning_rate = learning_rate
         self.current_learning_rate = learning_rate
         self.decay = decay
@@ -155,14 +158,15 @@ class Optimizer_SGD:
 
     def pre_update_params(self):
         if self.decay:
-            self.current_learning_rate = self.learning_rate * (1/(1+self.decay * self.iterations))
+            self.current_learning_rate = self.learning_rate * (1/(1+(self.decay * self.iterations)))
+            print((1/(1+self.decay * self.iterations)))
+        self.current_learning_rate = self.learning_rate
 
     def post_update_params(self):
         self.iterations += 1
 
     # Update parameters
     def update_params(self, layer):
-        """
         if self.momentum:
             # If layer doesn't contain momentum arrays, creates them
             # filled with zeros
@@ -173,20 +177,11 @@ class Optimizer_SGD:
                 layer.biases_momentums = np.zeros_like(layer.biases)
             weights_updates = self.momentum * layer.weights_momentums - self.current_learning_rate * layer.dweights
             biases_updates = self.momentum * layer.biases_momentums - self.current_learning_rate * layer.dbiases
-            #print("weight with momentum")
-            w1 = layer.weights+weights_updates
-            #print(w1[1])
-            #print("layer weights momentum")
-            #print(layer.weights_momentums)
-            #print("weight without")
-            w2 = layer.weights -self.current_learning_rate * layer.dweights
-            #print(w2[1])
             layer.weights_momentums = weights_updates
             layer.biases_momentums = biases_updates
         else:
             weights_updates = - self.current_learning_rate * layer.dweights
             biases_updates = - self.current_learning_rate * layer.dbiases
-        """
         # layer.weights_momentums = weights_updates
         layer.weights += -self.learning_rate * layer.dweights
         # layer.biases_momentums = biases_updates
@@ -196,7 +191,7 @@ class Optimizer_SGD:
 
 class Model:
     def __init__(self, dense1, dense2):
-        self.optimizer = Optimizer_SGD(decay=0.1,momentum=0.)
+        self.optimizer = Optimizer_SGD(decay=0,momentum=0)
         self.activation1 = Activation_Relu()
         self.loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
         self.dense1 = dense1
@@ -226,7 +221,7 @@ class Model:
         self.dense1.backward(self.activation1.dinputs)
 
     def optimize(self):
-        #self.optimizer.pre_update_params()
+        self.optimizer.pre_update_params()
         self.optimizer.update_params(dense1)
         self.optimizer.update_params(dense2)
         self.optimizer.post_update_params()
@@ -236,54 +231,19 @@ class Model:
 #dataset
 # X positions (coordinates x,y)
 # y : list of value of labels
-X, y = spiral_data(samples=2, classes=2)
+X, y = spiral_data(samples=100, classes=3)
 # 2 input features and 3 output values
-dense1 = Layer_Dense(2,2)
+dense1 = Layer_Dense(2,64)
 # 3 input features and 3 output values (takes the output of previous layer)
-dense2 = Layer_Dense(2,3)
+dense2 = Layer_Dense(64,3)
 
 model = Model(dense1, dense2)
-print("Points")
-print(X)
-for i in range(2):
-    model.iterate(X,y)
-    print("dense1:")
-    print(model.dense1.weights)
-    print(model.dense1.biases)
-    print("output")
-    print(model.dense1.output)
-    print("matmul:")
-    print(np.matmul(X,model.dense1.weights)+ model.dense1.biases)
-    print("dense2")
-    print(model.dense2.weights)
-    print(model.dense2.biases)
-    print("dense2 output")
-    print(model.dense2.output)
-    print("matmul:")
-    print(np.matmul(model.dense1.output,model.dense2.weights)+model.dense2.biases)
-    model.backward()
-    print("dweights dense2")
-    print(model.dense2.dweights)
-    print(model.dense2.dbiases)
-    print("dweights dense1")
-    print(model.dense1.dweights)
-    print(model.dense1.dbiases)
-    model.optimize()
-    print("###########optimize#######")
-    print(model.dense1.weights)
-    print(model.dense1.biases)
-    print("dense2")
-    print(model.dense2.weights)
-    print(model.dense2.biases)
-    print("loss output")
-    print(model.loss_activation.output)
-    print(f'epoch : {i}, ' + f'acc: {model.accuracy:.3f} '
-    + f'loss: {model.loss:.4f} ' +
-    f'lr: {model.optimizer.current_learning_rate:0.10f}')
 
-        #print(model.dense2.dweights)
-        #print(model.dense1.weights[1][1])
-        # print("weights")
-        # print(model.dense1.weights)
-        # print("biases")
-        # print(model.dense1.biases)
+for i in range(1):
+    model.iterate(X,y)
+    model.backward()
+    model.optimize()
+    if not i % 1000:
+        print(f'epoch : {i}, ' + f'acc: {model.accuracy:.3f} '
+        + f'loss: {model.loss:.4f} ' +
+        f'lr: {model.optimizer.learning_rate:0.10f}')
