@@ -103,9 +103,6 @@ class Activation_Softmax_Loss_CategoricalCrossentropy():
         # and substract column at y_true position for each rows
         # (simplier way to do Softmax backward)
         self.dinputs[range(samples), y_true] -= 1
-        print(samples == len(y_true))
-        print(self.dinputs.shape)
-        print(y_true)
         # Normalize gradient
         self.dinputs = self.dinputs / samples
 
@@ -149,7 +146,7 @@ class Activation_Relu:
 class Optimizer_SGD:
     # Initialize optimizer - set settings
     # Learning rate of 1
-    def __init__(self, learning_rate=0.85, decay=0, momentum=0):
+    def __init__(self, learning_rate, decay, momentum):
         self.learning_rate = learning_rate
         self.current_learning_rate = learning_rate
         self.decay = decay
@@ -158,9 +155,9 @@ class Optimizer_SGD:
 
     def pre_update_params(self):
         if self.decay:
-            self.current_learning_rate = self.learning_rate * (1/(1+(self.decay * self.iterations)))
-            print((1/(1+self.decay * self.iterations)))
-        self.current_learning_rate = self.learning_rate
+            self.current_learning_rate = self.learning_rate * (1/(1+self.decay * self.iterations))
+            #print(self.current_learning_rate)
+        self.learning_rate = self.current_learning_rate
 
     def post_update_params(self):
         self.iterations += 1
@@ -190,8 +187,8 @@ class Optimizer_SGD:
 
 
 class Model:
-    def __init__(self, dense1, dense2):
-        self.optimizer = Optimizer_SGD(decay=0,momentum=0)
+    def __init__(self, dense1, dense2, learning_rate = 1,decay=1e-7, momentum=1):
+        self.optimizer = Optimizer_SGD(learning_rate, decay,momentum)
         self.activation1 = Activation_Relu()
         self.loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
         self.dense1 = dense1
@@ -239,11 +236,12 @@ dense2 = Layer_Dense(64,3)
 
 model = Model(dense1, dense2)
 
-for i in range(1):
+for i in range(20001):
     model.iterate(X,y)
     model.backward()
     model.optimize()
     if not i % 1000:
-        print(f'epoch : {i}, ' + f'acc: {model.accuracy:.3f} '
+        print(f'epoch : {i}, ' + f'acc: {model.accuracy: .3f} '
         + f'loss: {model.loss:.4f} ' +
         f'lr: {model.optimizer.learning_rate:0.10f}')
+        #print(model.dense1.weights)
