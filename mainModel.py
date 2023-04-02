@@ -216,15 +216,44 @@ class Optimizer_Adagrad:
         layer.weights += -self.current_learning_rate*layer.dweights/(np.sqrt(layer.weight_cache)+self.epsilon)
         layer.biases += -self.current_learning_rate*layer.dbiases/(np.sqrt(layer.bias_cache)+self.epsilon)
         print(layer.weights)
-        #print(layer.dweights)
-        #print(layer.weight_cache)
 
+class Optimizer_RMSProp:
+    # Initialize optimizer - set settings
+    # Learning rate of 1
+    def __init__(self, learning_rate, decay, epsilon, rho):
+        self.learning_rate = learning_rate
+        self.current_learning_rate = learning_rate
+        self.decay = decay
+        self.iterations = 0
+        self.epsilon = epsilon
+        self.rho = rho
 
+    #Processes learning rate for the next iteration
+    def pre_update_params(self):
+        if self.decay:
+            self.current_learning_rate = self.learning_rate * (1/(1+self.decay * self.iterations))
+            #print(self.current_learning_rate)
+        self.learning_rate = self.current_learning_rate
+
+    def post_update_params(self):
+        self.iterations += 1
+
+    # Update parameters
+    def update_params(self, layer):
+        if not hasattr(layer, 'weight_cache'):
+            layer.weight_cache = np.zeros_like(layer.weights)
+            # If there is not cache array for weights
+            # there is not cache for biases either
+            layer.bias_cache = np.zeros_like(layer.biases)
+        layer.weight_cache = self.rho * layer.weight_cache + (1 - self.rho) * layer.dweights**2
+        layer.bias_cache = self.rho * layer.bias_cache + (1 - self.rho) * layer.dbiases**2
+        layer.weights += -self.current_learning_rate*layer.dweights/(np.sqrt(layer.weight_cache)+self.epsilon)
+        layer.biases += -self.current_learning_rate*layer.dbiases/(np.sqrt(layer.bias_cache)+self.epsilon)
 
 
 class Model:
-    def __init__(self, dense1, dense2, learning_rate = 0.85,decay=1e-9, momentum=0.9):
-        self.optimizer = Optimizer_SGD(learning_rate, decay,momentum)
+    def __init__(self, dense1, dense2, learning_rate = 0.02,decay=1e-7, epsilon=1e-7, rho=0.999):
+        self.optimizer = Optimizer_RMSProp(learning_rate, decay,epsilon, rho)
         self.activation1 = Activation_Relu()
         self.loss_activation = Activation_Softmax_Loss_CategoricalCrossentropy()
         self.dense1 = dense1
